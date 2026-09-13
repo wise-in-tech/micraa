@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Micraa - Test Audio LiveKit</title>
+    <script src="https://unpkg.com/livekit-client/dist/livekit-client.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .disconnect {
+            background: #f44336;
+        }
+        .disconnect:hover {
+            background: #da190b;
+        }
+        #status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        .error {
+            background: #ffebee !important;
+            color: #c62828 !important;
+        }
+        .success {
+            background: #e8f5e9 !important;
+            color: #2e7d32 !important;
+        }
+        #participants {
+            margin-top: 20px;
+        }
+        #debug {
+            margin-top: 20px;
+            padding: 12px;
+            border-radius: 5px;
+            background: #111;
+            color: #ddd;
+            font-size: 12px;
+            white-space: pre-wrap;
+            max-height: 220px;
+            overflow: auto;
+        }
+        .participant {
+            padding: 10px;
+            margin: 5px 0;
+            background: #f5f5f5;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .audio-indicator {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #ccc;
+            margin-left: 10px;
+        }
+        .audio-indicator.speaking {
+            background: #4CAF50;
+            animation: pulse 0.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎙️ Micraa - Test Audio LiveKit</h1>
+        
+        <div class="form-group">
+            <label>API URL:</label>
+            <input type="text" id="apiUrl" value="http://localhost:8080" />
+        </div>
+
+        <div class="form-group">
+            <label>ID de la classe:</label>
+            <input type="number" id="classId" value="7" />
+        </div>
+
+        <div class="form-group">
+            <label>ID utilisateur:</label>
+            <input type="number" id="userId" value="1" />
+        </div>
+
+        <div class="form-group">
+            <label>LiveKit Server URL (optionnel - laissez vide pour utiliser le serveur de l'API):</label>
+            <input type="text" id="livekitUrl" placeholder="ws://localhost:7880 ou wss://your-livekit-server.com" />
+        </div>
+
+        <div class="form-group">
+            <label>Access Token (optionnel - pour test direct sans appel API):</label>
+            <textarea id="accessToken" rows="3" placeholder="Collez ici un token LiveKit si vous voulez bypass l'API join"></textarea>
+        </div>
+
+        <button id="joinBtn" onclick="joinClass()">Rejoindre la classe</button>
+        <button id="disconnectBtn" onclick="disconnect()" style="display:none;" class="disconnect">Quitter</button>
+        
+        <div id="status">
+            Cliquez sur "Rejoindre la classe" pour commencer
+        </div>
+
+        <div id="participants"></div>
+        <pre id="debug">Logs debug...</pre>
+    </div>
+
+    <script>
+        let room = null;
+        let localParticipant = null;
+
+        async function joinClass() {
+            const apiUrl = document.getElementById('apiUrl').value;
+            const classId = document.getElementById('classId').value;
+            const userId = document.getElementById('userId').value;
+            const customLivekitUrl = document.getElementById('livekitUrl').value.trim();
+            const manualToken = document.getElementById('accessToken').value.trim();
+            
+            const joinBtn = document.getElementById('joinBtn');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            const statusDiv = document.getElementById('status');
+            
+            try {
+                joinBtn.disabled = true;
+                statusDiv.className = '';
+                debug('Init', { classId, userId, customLivekitUrl, manualTokenProvided: !!manualToken });
+
+                const LK = window.LivekitClient || window.LiveKitClient || window.livekit;
+                if (!LK) {
+                    throw new Error("SDK LiveKit non chargé. Vérifiez votre connexion internet ou rechargez la page.");
+                }
+
+                let token = manualToken;
+                let roomName = `class-${classId}`;
+                let livekitUrl = customLivekitUrl || 'ws://localhost:7880';
+                
+                // Si pas de token manuel, on passe par l'API join
+                if (!token) {
+                    statusDiv.textContent = '🔄 Connexion à l\'API...';
+
+                    const response = await fetch(`${apiUrl}/api/live-classes/${classId}/join?userId=${userId}`, {
+                        method: 'POST'
+                    });
+
+                    if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(error.error || 'Erreur lors de la connexion');
+                    }
+
+                    const data = await response.json();
+                    debug('Réponse API join', {
+                        livekitUrl: data.livekitUrl,
+                        roomName: data.roomName,
+                        tokenPreview: `${(data.accessToken || '').slice(0, 20)}...`
+                    });
+
+                    token = data.accessToken;
+                    roomName = data.roomName;
+                    livekitUrl = customLivekitUrl || data.livekitUrl;
+                }
+                
+                // Normalisation URL websocket
+                if (livekitUrl.includes('livekit:7880')) {
+                    livekitUrl = 'ws://localhost:7880';
+                }
+                if (livekitUrl.startsWith('http://')) {
+                    livekitUrl = livekitUrl.replace('http://', 'ws://');
+                }
+                if (livekitUrl.startsWith('https://')) {
+                    livekitUrl = livekitUrl.replace('https://', 'wss://');
+                }
+
+                debug('Connexion LiveKit', {
+                    livekitUrl,
+                    roomName,
+                    tokenPreview: `${(token || '').slice(0, 20)}...`
+                });
+                
+                statusDiv.textContent = `🔄 Connexion à LiveKit (${livekitUrl})...`;
+                
+                // Connexion à LiveKit
+                room = new LK.Room({
+                    adaptiveStream: true,
+                    dynacast: true,
+                });
+
+                // Écouteurs d'événements
+                room.on(LK.RoomEvent.ParticipantConnected, (participant) => {
+                    console.log('Participant connecté:', participant.identity);
+                    updateParticipants();
+                    statusDiv.textContent = `✅ ${participant.identity} a rejoint la classe`;
+                    statusDiv.className = 'success';
+                    debug('Participant connecté', { identity: participant.identity });
+                });
+
+                room.on(LK.RoomEvent.ParticipantDisconnected, (participant) => {
+                    console.log('Participant déconnecté:', participant.identity);
+                    updateParticipants();
+                    debug('Participant déconnecté', { identity: participant.identity });
+                });
+
+                room.on(LK.RoomEvent.TrackSubscribed, (track, publication, participant) => {
+                    console.log('Track reçu:', track.kind, 'de', participant.identity);
+                    if (track.kind === 'audio') {
+                        const audioElement = track.attach();
+                        document.body.appendChild(audioElement);
+                        audioElement.play();
+                        debug('Audio track reçu', { from: participant.identity });
+                    }
+                });
+
+                room.on(LK.RoomEvent.ActiveSpeakersChanged, (speakers) => {
+                    updateSpeakers(speakers);
+                });
+
+                room.on(LK.RoomEvent.Disconnected, () => {
+                    debug('Déconnecté de LiveKit', {});
+                });
+
+                // Connexion à la room
+                await room.connect(livekitUrl, token);
+                
+                // Activer le microphone
+                await room.localParticipant.setMicrophoneEnabled(true);
+                
+                localParticipant = room.localParticipant;
+                
+                statusDiv.textContent = `✅ Connecté à la classe "${roomName}" - Microphone activé`;
+                statusDiv.className = 'success';
+                debug('Connexion réussie', { roomName, localIdentity: room.localParticipant.identity });
+                
+                joinBtn.style.display = 'none';
+                disconnectBtn.style.display = 'inline-block';
+                
+                updateParticipants();
+                
+            } catch (error) {
+                console.error('Erreur:', error);
+                statusDiv.textContent = `❌ Erreur: ${error.message}`;
+                statusDiv.className = 'error';
+                joinBtn.disabled = false;
+                debug('Erreur join/connect', {
+                    message: error?.message,
+                    detail: error?.toString?.()
+                });
+            }
+        }
+
+        function debug(label, payload) {
+            const debugEl = document.getElementById('debug');
+            const line = `[${new Date().toLocaleTimeString()}] ${label}\n${JSON.stringify(payload, null, 2)}\n`;
+            debugEl.textContent = `${line}\n${debugEl.textContent}`;
+        }
+
+        function updateParticipants() {
+            if (!room) return;
+            
+            const participantsDiv = document.getElementById('participants');
+            participantsDiv.innerHTML = '<h3>👥 Participants:</h3>';
+            
+            // Participant local
+            const localDiv = document.createElement('div');
+            localDiv.className = 'participant';
+            localDiv.innerHTML = `
+                <span>🎤 Vous (${room.localParticipant.identity})</span>
+                <div class="audio-indicator" id="local-indicator"></div>
+            `;
+            participantsDiv.appendChild(localDiv);
+            
+            // Participants distants
+            room.remoteParticipants.forEach((participant) => {
+                const participantDiv = document.createElement('div');
+                participantDiv.className = 'participant';
+                participantDiv.innerHTML = `
+                    <span>👤 ${participant.identity}</span>
+                    <div class="audio-indicator" id="indicator-${participant.sid}"></div>
+                `;
+                participantsDiv.appendChild(participantDiv);
+            });
+        }
+
+        function updateSpeakers(speakers) {
+            // Réinitialiser tous les indicateurs
+            document.querySelectorAll('.audio-indicator').forEach(el => {
+                el.classList.remove('speaking');
+            });
+            
+            // Activer les indicateurs pour ceux qui parlent
+            speakers.forEach(speaker => {
+                const indicator = speaker === room.localParticipant 
+                    ? document.getElementById('local-indicator')
+                    : document.getElementById(`indicator-${speaker.sid}`);
+                if (indicator) {
+                    indicator.classList.add('speaking');
+                }
+            });
+        }
+
+        async function disconnect() {
+            if (room) {
+                await room.disconnect();
+                room = null;
+            }
+            
+            document.getElementById('joinBtn').style.display = 'inline-block';
+            document.getElementById('joinBtn').disabled = false;
+            document.getElementById('disconnectBtn').style.display = 'none';
+            document.getElementById('status').textContent = 'Déconnecté';
+            document.getElementById('status').className = '';
+            document.getElementById('participants').innerHTML = '';
+            debug('Disconnect manuel', {});
+        }
+    </script>
+</body>
+</html>

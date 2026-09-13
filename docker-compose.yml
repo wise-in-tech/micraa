@@ -1,0 +1,64 @@
+services:
+  # PostgreSQL Database - Port changé de 5432 à 5433 pour éviter le conflit
+  postgres:
+    image: postgres:15
+    container_name: micraa-postgres
+    environment:
+      POSTGRES_DB: micraa
+      POSTGRES_USER: micraa
+      POSTGRES_PASSWORD: micraa123
+    ports:
+      - "5433:5432"  # Port externe changé à 5433
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U micraa"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - micraa-network
+
+  # LiveKit Server
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: micraa-livekit
+    command: --config /etc/livekit.yaml
+    ports:
+      - "7880:7880"  # HTTP/WebSocket
+      - "7881:7881"  # RTC/TCP fallback
+      - "7882:7882/udp"  # RTC/UDP
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+    networks:
+      - micraa-network
+
+  # Spring Boot Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: micraa-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      livekit:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/micraa
+      SPRING_DATASOURCE_USERNAME: micraa
+      SPRING_DATASOURCE_PASSWORD: micraa123
+      LIVEKIT_URL: ws://localhost:7880
+      LIVEKIT_API_KEY: devkey
+      LIVEKIT_API_SECRET: secret
+    ports:
+      - "8080:8080"
+    networks:
+      - micraa-network
+
+networks:
+  micraa-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

@@ -1,0 +1,330 @@
+{
+  "info": {
+    "name": "Micraa API",
+    "description": "Collection for testing Micraa Live Classroom API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080/api",
+      "type": "string"
+    },
+    {
+      "key": "teacherId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "studentId",
+      "value": "2",
+      "type": "string"
+    },
+    {
+      "key": "classId",
+      "value": "1",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["health"]
+        }
+      }
+    },
+    {
+      "name": "Create Teacher",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "    var jsonData = pm.response.json();",
+              "    pm.collectionVariables.set('teacherId', jsonData.id);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Prof. Martin\",\n  \"email\": \"martin@school.com\",\n  \"role\": \"TEACHER\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/users",
+          "host": ["{{baseUrl}}"],
+          "path": ["users"]
+        }
+      }
+    },
+    {
+      "name": "Create Student",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "    var jsonData = pm.response.json();",
+              "    pm.collectionVariables.set('studentId', jsonData.id);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Alice Dupont\",\n  \"email\": \"alice@school.com\",\n  \"role\": \"STUDENT\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/users",
+          "host": ["{{baseUrl}}"],
+          "path": ["users"]
+        }
+      }
+    },
+    {
+      "name": "Get All Users",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/users",
+          "host": ["{{baseUrl}}"],
+          "path": ["users"]
+        }
+      }
+    },
+    {
+      "name": "Get All Teachers",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/users/teachers",
+          "host": ["{{baseUrl}}"],
+          "path": ["users", "teachers"]
+        }
+      }
+    },
+    {
+      "name": "Get All Students",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/users/students",
+          "host": ["{{baseUrl}}"],
+          "path": ["users", "students"]
+        }
+      }
+    },
+    {
+      "name": "Create Live Class",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "    var jsonData = pm.response.json();",
+              "    pm.collectionVariables.set('classId', jsonData.id);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Mathématiques - Algèbre\",\n  \"teacherId\": {{teacherId}},\n  \"scheduledAt\": \"2026-08-21T10:00:00\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/live-classes",
+          "host": ["{{baseUrl}}"],
+          "path": ["live-classes"]
+        }
+      }
+    },
+    {
+      "name": "Get Teacher Classes",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/live-classes?userId={{teacherId}}&role=TEACHER",
+          "host": ["{{baseUrl}}"],
+          "path": ["live-classes"],
+          "query": [
+            {
+              "key": "userId",
+              "value": "{{teacherId}}"
+            },
+            {
+              "key": "role",
+              "value": "TEACHER"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get Student Classes",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/live-classes?userId={{studentId}}&role=STUDENT",
+          "host": ["{{baseUrl}}"],
+          "path": ["live-classes"],
+          "query": [
+            {
+              "key": "userId",
+              "value": "{{studentId}}"
+            },
+            {
+              "key": "role",
+              "value": "STUDENT"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get Live Class Details",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/live-classes/{{classId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["live-classes", "{{classId}}"]
+        }
+      }
+    },
+    {
+      "name": "Add Students to Class",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"studentIds\": [{{studentId}}]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/live-classes/{{classId}}/students",
+          "host": ["{{baseUrl}}"],
+          "path": ["live-classes", "{{classId}}", "students"]
+        }
+      }
+    },
+    {
+      "name": "Start Live Class",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/live-classes/{{classId}}/start?teacherId={{teacherId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["live-classes", "{{classId}}", "start"],
+          "query": [
+            {
+              "key": "teacherId",
+              "value": "{{teacherId}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Teacher Join Class",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/live-classes/{{classId}}/join?userId={{teacherId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["live-classes", "{{classId}}", "join"],
+          "query": [
+            {
+              "key": "userId",
+              "value": "{{teacherId}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Student Join Class",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/live-classes/{{classId}}/join?userId={{studentId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["live-classes", "{{classId}}", "join"],
+          "query": [
+            {
+              "key": "userId",
+              "value": "{{studentId}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "End Live Class",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/live-classes/{{classId}}/end?teacherId={{teacherId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["live-classes", "{{classId}}", "end"],
+          "query": [
+            {
+              "key": "teacherId",
+              "value": "{{teacherId}}"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
