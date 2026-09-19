@@ -1,7 +1,9 @@
-:80 {
+micraa.be {
+    # Automatically handles HTTPS with Let's Encrypt
     reverse_proxy app:8080
 }
 
-:443 {
-    reverse_proxy app:8080
+# Redirect HTTP to HTTPS
+http://micraa.be {
+    redir https://micraa.be{uri} permanent
 }

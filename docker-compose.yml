@@ -48,9 +48,10 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/micraa
       SPRING_DATASOURCE_USERNAME: micraa
       SPRING_DATASOURCE_PASSWORD: micraa123
-      LIVEKIT_URL: ws://localhost:7880
+      LIVEKIT_URL: wss://micraa.be:7880
       LIVEKIT_API_KEY: devkey
       LIVEKIT_API_SECRET: secret
+      SERVER_SERVLET_CONTEXT_PATH: /api
     ports:
       - "8080:8080"
     networks:
