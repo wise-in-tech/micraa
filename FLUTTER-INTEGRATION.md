@@ -168,11 +168,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  // En développement - utiliser l'IP de votre machine (pas localhost!)
-  // Pour iOS Simulator: localhost fonctionne
-  // Pour Android Emulator: utiliser 10.0.2.2
-  // Pour device réel: utiliser l'IP de votre machine
-  static const String baseUrl = 'http://localhost:8080/api';
+  // Production: API publique accessible en HTTPS
+  static const String baseUrl = 'https://micraa.be/api';
   
   // Get all users
   Future<List<User>> getUsers() async {

@@ -3,6 +3,10 @@ micraa.be {
     reverse_proxy app:8080
 }
 
+livekit.micraa.be {
+    reverse_proxy livekit:7880
+}
+
 # Redirect HTTP to HTTPS
 http://micraa.be {
     redir https://micraa.be{uri} permanent
