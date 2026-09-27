@@ -48,6 +48,7 @@ A teacher can:
 - See connected participants
 - Communicate using audio
 - Mute/unmute their microphone
+- Mute/unmute a student's microphone during their live class
 - Use text chat
 - End the live class
 
@@ -615,19 +616,35 @@ Flutter App
 ### Roles in This Platform
 
 ```text
+ADMIN
+    - Can create teacher accounts
+    - Can create and schedule live classes
+    - Can manage platform administration
+
 TEACHER
-  - Can create live classes
-  - Can start their own classes
-  - Can end their own classes
+    - Can manage classes assigned by an admin
+    - Can start and end their assigned classes
   - Can see all students
   - Cannot join classes as a student
 
 STUDENT
+    - Can create an account from the mobile app
   - Can see classes they are enrolled in
   - Can join LIVE classes they are enrolled in
   - Cannot start or end classes
   - Cannot create classes
 ```
+
+### Account and password rules
+
+- A user may have one or more roles; permissions are cumulative.
+- Public registration creates a `STUDENT` account only.
+- Only an `ADMIN` can create a `TEACHER` account.
+- Users can change their password from the frontend application.
+- Users can request a password-reset link by e-mail.
+- The initial Micraa e-mail sender will be a dedicated Google `no-reply` address configured outside source control.
+
+The current MVP code still supports only `TEACHER` and `STUDENT`, stores one role per user, and has no password-reset mail flow. These rules describe the target authorization model.
 
 ### How Roles Are Enforced
 
@@ -874,7 +891,7 @@ No AI functionality initially.
 Do NOT implement:
 
 - Full LMS
-- Moodle integration
+- Moodle integration in V1 (planned for V2)
 - Course management
 - Lessons
 - Assignments
@@ -891,7 +908,32 @@ Do NOT implement:
 - Complex scheduling
 - Microservices
 
-These may be added later.
+These features are outside V1. Moodle integration is explicitly planned for V2; the other items remain future candidates unless prioritized separately.
+
+---
+
+# Moodle Integration — V2 Direction
+
+Moodle integration is part of the planned V2 scope. V1 remains a standalone Micraa application and must not introduce Moodle dependencies before the V2 design is approved.
+
+The V2 integration may support:
+
+- Linking Micraa users to Moodle users.
+- Synchronizing users, courses, groups, and enrolments where required.
+- Opening or joining a Micraa live class from a Moodle course.
+- Returning the class status and participation information to Moodle when appropriate.
+- Supporting a documented Moodle authentication or single-sign-on strategy.
+
+The exact synchronization direction, Moodle version, authentication method, Moodle plugin or REST API usage, data ownership, and conflict resolution rules must be defined before implementation.
+
+V1 must preserve clear integration boundaries so V2 can be added without rewriting the live-class domain:
+
+- Keep Micraa user, class, enrolment, and attendance services behind backend interfaces.
+- Use stable internal IDs and external-reference fields rather than using Moodle IDs as primary keys.
+- Keep Moodle-specific code in a separate integration module or package.
+- Do not expose Moodle credentials or web-service tokens to Flutter.
+- Make synchronization idempotent and auditable.
+- Treat Micraa as the source of truth for live audio rooms and LiveKit tokens.
 
 ---
 
@@ -899,7 +941,7 @@ These may be added later.
 
 The platform may eventually evolve into a complete school e-learning platform.
 
-Possible future capabilities:
+Possible future capabilities beyond the V2 Moodle integration:
 
 - Courses
 - Lessons
@@ -916,7 +958,6 @@ Possible future capabilities:
 - Personalized learning
 - AI-generated exercises
 - Learning analytics
-- Moodle integration if useful
 
 The current architecture should allow these capabilities to be added without unnecessarily complicating V1.
 

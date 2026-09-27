@@ -1,14 +1,12 @@
 package com.wiseintech.micraa.controller;
 
 import com.wiseintech.micraa.dto.UserResponse;
-import com.wiseintech.micraa.model.UserRole;
 import com.wiseintech.micraa.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/users")
@@ -36,18 +34,9 @@ public class UserController {
     public ResponseEntity<UserResponse> getUser(@PathVariable Long id) {
         return ResponseEntity.ok(userService.getUser(id));
     }
-    
-    /**
-     * Temporary endpoint to create users for testing
-     * Will be replaced with proper authentication
-     */
-    @PostMapping
-    public ResponseEntity<UserResponse> createUser(@RequestBody Map<String, String> request) {
-        String name = request.get("name");
-        String email = request.get("email");
-        UserRole role = UserRole.valueOf(request.get("role"));
-        
-        UserResponse user = userService.createUser(name, email, role);
-        return ResponseEntity.ok(user);
-    }
+
+    // The legacy "POST /api/users" endpoint that let any authenticated caller create a
+    // user with an arbitrary role (including TEACHER) has been removed. Teacher accounts
+    // are now created exclusively through the ADMIN-only "POST /api/admin/teachers"
+    // endpoint (see AdminController).
 }

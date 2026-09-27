@@ -240,4 +240,4 @@ En cas de problème :
 1. Vérifiez que Docker Desktop est démarré
 2. Consultez les logs : `docker-compose logs -f`
 3. Vérifiez l'API : `curl http://localhost:8080/api/health`
-4. Consultez README-DOCKER.md pour plus de détails
+4. Consultez [doc/README.md](doc/README.md) pour la documentation complète

@@ -11,7 +11,7 @@ Micraa est une plateforme de classes en direct pour établissements scolaires. L
 - ✅ Stockage JWT sécurisé côté Flutter
 - ✅ Routage post-auth direct vers l'espace du compte connecté
 - ✅ Flux classe prof/étudiant fonctionnel (création, start, join, end)
-- ✅ Exposition mobile via Cloudflare Tunnel (App/API/LiveKit)
+- ✅ Exposition mobile via HTTPS Caddy (`micraa.be` et `livekit.micraa.be`)
 
 ## Stack Technique
 
@@ -188,9 +188,12 @@ Micraa est une plateforme de classes en direct pour établissements scolaires. L
 
 ### Types Énumérés
 
-**UserRole:**
+**UserRole (cible):**
+- `ADMIN`
 - `TEACHER`
 - `STUDENT`
+
+Un utilisateur peut avoir plusieurs rôles. Le MVP actuel stocke encore un seul rôle et ne contient pas `ADMIN`; la migration du modèle est une priorité de la prochaine implémentation.
 
 **LiveClassStatus:**
 - `SCHEDULED` : Classe créée mais pas encore démarrée
@@ -256,66 +259,12 @@ livekit.api.secret=secret  # NE JAMAIS exposer au client !
 | livekit | livekit/livekit-server:latest | 7880, 7881, 50000-50100/udp | Serveur WebRTC |
 | app | Custom (Dockerfile) | 8080 | Application Spring Boot |
 
-### Exposition HTTPS via Cloudflare Tunnel (dev / tests mobile)
+### Exposition HTTPS de production
 
-Pour tester depuis un téléphone (même hors LAN), l'application utilise 3 tunnels Cloudflare temporaires (`trycloudflare.com`) :
-
-- **App Flutter Web**: `http://localhost:4000` → `https://<app-tunnel>.trycloudflare.com`
-- **API Spring Boot**: `http://localhost:8080` → `https://<api-tunnel>.trycloudflare.com`
-- **LiveKit (WebSocket)**: `http://localhost:7880` → `https://<livekit-tunnel>.trycloudflare.com` (consommé côté client en `wss://...`)
-
-#### Configuration côté client Flutter
-
-Dans le fichier de config Flutter (`micraa_flutter/lib/config/app_config.dart`) :
-
-- `kCloudflaredApiUrl` doit pointer vers le tunnel API (`https://...`)
-- `kCloudflaredLiveKitUrl` doit pointer vers le tunnel LiveKit (`wss://...`)
-
-Exemple :
-
-```dart
-const String? kCloudflaredApiUrl = 'https://<api-tunnel>.trycloudflare.com';
-const String? kCloudflaredLiveKitUrl = 'wss://<livekit-tunnel>.trycloudflare.com';
-```
-
-#### Démarrage des tunnels
-
-Pré-requis : `cloudflared` installé localement.
-
-```bash
-# App Flutter Web
-cloudflared tunnel --url http://localhost:4000
-
-# API Spring Boot
-cloudflared tunnel --url http://localhost:8080
-
-# LiveKit
-cloudflared tunnel --url http://localhost:7880
-```
-
-Chaque commande affiche une URL publique `https://...trycloudflare.com`.
-
-#### Vérifications rapides
-
-```bash
-# Vérifier les processus cloudflared actifs
-pgrep -af cloudflared
-
-# Vérifier l'app
-curl -I https://<app-tunnel>.trycloudflare.com
-
-# Vérifier l'API
-curl -I https://<api-tunnel>.trycloudflare.com/api/health
-
-# Vérifier LiveKit (401 attendu sans token = tunnel OK)
-curl -I https://<livekit-tunnel>.trycloudflare.com/rtc/validate
-```
-
-#### Points d'attention
-
-- Les URLs `trycloudflare.com` expirent : régénérer les tunnels puis mettre à jour la config Flutter.
-- Après changement des URLs, reconstruire le build web Flutter pour embarquer la nouvelle config.
-- Si le navigateur affiche un listing de dossier au lieu de l'app, vérifier le répertoire servi par le serveur web local (doit servir `build/web`).
+- API REST : `https://micraa.be/api`
+- LiveKit : `wss://livekit.micraa.be`
+- Caddy termine TLS et reverse-proxy l'API vers `app:8080` et LiveKit vers `livekit:7880`.
+- Le client mobile ne reçoit jamais la clé ou le secret API LiveKit.
 
 ## Décisions Techniques Clés
 
@@ -429,8 +378,22 @@ Monolith → Microservices potentiels
 7. ⚠️ Pas de notifications push
 8. ⚠️ Pas de gestion des permissions granulaires par matière/groupe
 9. ⚠️ Inscription étudiant MVP: auto-inscription des étudiants existants à la création d'une classe (pas encore de roster UI par classe)
+10. ⚠️ Intégration Moodle non incluse en v1; prévue comme intégration séparée en v2
 
 Ces limitations seront adressées dans les versions futures selon les priorités métier.
+
+## Préparation de l'intégration Moodle v2
+
+Moodle sera intégré en v2, sans devenir une dépendance du cœur de Micraa v1. L'architecture doit donc isoler cette future intégration dans un module ou package dédié, avec des adaptateurs pour les API Moodle et la synchronisation.
+
+Principes à préserver dès maintenant :
+
+- les entités Micraa conservent leurs propres identifiants et leur propre cycle de vie ;
+- les références externes Moodle sont ajoutées séparément et ne remplacent pas les clés primaires ;
+- la synchronisation doit être idempotente, rejouable et journalisée ;
+- les secrets, tokens et comptes de service Moodle restent côté backend ;
+- Flutter ne communique jamais directement avec Moodle pour les opérations sensibles ;
+- Micraa reste responsable des classes live, des autorisations de participation et des tokens LiveKit.
 
 ## Prochaines Étapes Techniques
 
@@ -477,6 +440,6 @@ Ces limitations seront adressées dans les versions futures selon les priorités
 ## Contact & Support
 
 Pour questions techniques :
-- Consulter la documentation : `README-DOCKER.md`
+- Consulter le [guide Docker](../operations/DOCKER.md)
 - Vérifier les logs : `make logs`
 - Tester l'API : `make test`

@@ -22,6 +22,11 @@ public class AuthService {
 
     /**
      * Enregistrer un nouvel utilisateur
+     *
+     * Public registration always creates a STUDENT account. Any "role" field sent by
+     * the client is intentionally ignored: a role supplied in a request body is never
+     * trusted as proof of authorization. Teacher accounts can only be created through
+     * the authenticated ADMIN-only path (see AdminController / UserService#createTeacher).
      */
     public AuthResponse register(AuthRequest request) {
         // Vérifier si l'email existe déjà
@@ -29,14 +34,11 @@ public class AuthService {
             throw new RuntimeException("Email already registered");
         }
 
-        // Créer l'utilisateur
-        UserRole role = UserRole.valueOf(request.getRole().toUpperCase());
-        
         User user = User.builder()
                 .name(request.getName())
                 .email(request.getEmail())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
-                .role(role)
+                .role(UserRole.STUDENT)
                 .build();
 
         user = userRepository.save(user);

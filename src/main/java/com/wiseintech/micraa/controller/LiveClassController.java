@@ -102,9 +102,50 @@ public class LiveClassController {
     public ResponseEntity<LiveClassResponse> endLiveClass(
             @PathVariable Long id,
             @RequestParam Long teacherId) {
-        
+
         log.info("Teacher {} ending live class {}", teacherId, id);
         LiveClassResponse response = liveClassService.endLiveClass(id, teacherId);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * List the participants currently connected to the live class, ordered by connection
+     * time (earliest first). Only the class's assigned teacher may call this - the
+     * caller's identity comes from their verified JWT (set as a request attribute by
+     * JwtAuthFilter), never from a client-supplied parameter.
+     */
+    @GetMapping("/{id}/participants")
+    public ResponseEntity<List<ParticipantResponse>> getConnectedParticipants(
+            @PathVariable Long id,
+            @RequestAttribute("userId") Long callerId) {
+
+        return ResponseEntity.ok(liveClassService.getConnectedParticipants(id, callerId));
+    }
+
+    /**
+     * Force-mute a student's microphone. Only the class's assigned teacher may call this.
+     */
+    @PostMapping("/{id}/participants/{participantId}/mute")
+    public ResponseEntity<MicrophoneActionResponse> muteParticipant(
+            @PathVariable Long id,
+            @PathVariable Long participantId,
+            @RequestAttribute("userId") Long callerId) {
+
+        log.info("Teacher {} requesting mute of participant {} in live class {}", callerId, participantId, id);
+        return ResponseEntity.ok(liveClassService.setParticipantMicrophone(id, participantId, callerId, true));
+    }
+
+    /**
+     * Un-mute a student's microphone that was previously force-muted by the teacher.
+     * Only the class's assigned teacher may call this.
+     */
+    @PostMapping("/{id}/participants/{participantId}/unmute")
+    public ResponseEntity<MicrophoneActionResponse> unmuteParticipant(
+            @PathVariable Long id,
+            @PathVariable Long participantId,
+            @RequestAttribute("userId") Long callerId) {
+
+        log.info("Teacher {} requesting unmute of participant {} in live class {}", callerId, participantId, id);
+        return ResponseEntity.ok(liveClassService.setParticipantMicrophone(id, participantId, callerId, false));
     }
 }

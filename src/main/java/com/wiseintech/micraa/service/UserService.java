@@ -6,6 +6,7 @@ import com.wiseintech.micraa.model.UserRole;
 import com.wiseintech.micraa.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,8 +17,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class UserService {
-    
+
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
     
     /**
      * Get all users
@@ -56,26 +58,28 @@ public class UserService {
     }
     
     /**
-     * Create a simple user (for testing - no real authentication yet)
+     * Create a TEACHER account. Only reachable through the ADMIN-protected
+     * POST /api/admin/teachers endpoint (see AdminController) - never exposed to public
+     * registration or to ordinary authenticated users.
      */
     @Transactional
-    public UserResponse createUser(String name, String email, UserRole role) {
-        log.info("Creating user: {} with email: {} and role: {}", name, email, role);
-        
+    public UserResponse createTeacher(String name, String email, String rawPassword) {
+        log.info("Admin creating teacher account: {} ({})", name, email);
+
         if (userRepository.findByEmail(email).isPresent()) {
             throw new RuntimeException("User with this email already exists");
         }
-        
+
         User user = User.builder()
             .name(name)
             .email(email)
-            .passwordHash("temp-hash") // Temporary - will implement proper auth later
-            .role(role)
+            .passwordHash(passwordEncoder.encode(rawPassword))
+            .role(UserRole.TEACHER)
             .build();
-        
+
         user = userRepository.save(user);
-        log.info("Created user with ID: {}", user.getId());
-        
+        log.info("Created teacher account with ID: {}", user.getId());
+
         return toUserResponse(user);
     }
     

@@ -3,13 +3,16 @@ package com.wiseintech.micraa.service;
 import com.wiseintech.micraa.dto.*;
 import com.wiseintech.micraa.model.*;
 import com.wiseintech.micraa.repository.*;
+import livekit.LivekitModels;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -254,8 +257,8 @@ public class LiveClassService {
         }
         
         // Generate LiveKit token
-        String roomName = "class-" + id;
-        String participantIdentity = user.getRole().name().toLowerCase() + "-" + userId;
+        String roomName = roomNameFor(id);
+        String participantIdentity = participantIdentity(user.getRole(), userId);
         String participantName = user.getName();
         
         String token = liveKitService.generateToken(roomName, participantIdentity, participantName);
@@ -267,6 +270,144 @@ public class LiveClassService {
             .build();
     }
     
+    /**
+     * List the participants currently connected to a live class, ordered by connection
+     * time (earliest first) - this is the order in which participants joined the audio
+     * room, which is the most natural reading for a teacher checking who has been
+     * present the longest. Only the class's assigned teacher may call this.
+     *
+     * LiveKit is the source of truth for who is connected and when they connected
+     * (ParticipantInfo.joinedAt); Spring Boot only enforces who is allowed to see that
+     * information. No audio is routed through Spring Boot.
+     */
+    @Transactional(readOnly = true)
+    public List<ParticipantResponse> getConnectedParticipants(Long liveClassId, Long requesterId) {
+        LiveClass liveClass = liveClassRepository.findById(liveClassId)
+            .orElseThrow(() -> new RuntimeException("Live class not found"));
+
+        if (!liveClass.getTeacherId().equals(requesterId)) {
+            throw new AccessDeniedException("Only the assigned teacher can view connected participants");
+        }
+
+        if (liveClass.getStatus() != LiveClassStatus.LIVE) {
+            // Nothing is connected to a room that isn't live yet / has already ended.
+            return List.of();
+        }
+
+        List<LivekitModels.ParticipantInfo> participants =
+            liveKitService.listParticipants(roomNameFor(liveClassId));
+
+        return participants.stream()
+            .map(this::toParticipantResponse)
+            // Earliest connection first; joinedAt is LiveKit's own monotonic timestamp
+            // (epoch seconds), not something derived from unordered map iteration.
+            .sorted(Comparator.comparingLong(ParticipantResponse::getConnectedAt))
+            .collect(Collectors.toList());
+    }
+
+    /**
+     * Mute or unmute a student's microphone in a live class. Only the class's assigned
+     * teacher may perform this action, only on an enrolled student, and only while the
+     * class is live. The command is enforced by LiveKit's server-side track control -
+     * not merely hidden behind a Flutter button.
+     */
+    @Transactional(readOnly = true)
+    public MicrophoneActionResponse setParticipantMicrophone(
+            Long liveClassId, Long participantUserId, Long requesterId, boolean muted) {
+
+        LiveClass liveClass = liveClassRepository.findById(liveClassId)
+            .orElseThrow(() -> new RuntimeException("Live class not found"));
+
+        if (!liveClass.getTeacherId().equals(requesterId)) {
+            throw new AccessDeniedException("Only the assigned teacher can control a participant's microphone");
+        }
+
+        if (liveClass.getStatus() != LiveClassStatus.LIVE) {
+            throw new RuntimeException("Class is not currently live");
+        }
+
+        User target = userRepository.findById(participantUserId)
+            .orElseThrow(() -> new RuntimeException("Participant not found"));
+
+        if (target.getRole() != UserRole.STUDENT
+                || !liveClassStudentRepository.existsByLiveClassIdAndStudentId(liveClassId, participantUserId)) {
+            throw new RuntimeException("User is not an enrolled student in this class");
+        }
+
+        String roomName = roomNameFor(liveClassId);
+        String identity = participantIdentity(UserRole.STUDENT, participantUserId);
+
+        LivekitModels.ParticipantInfo participant = liveKitService.getParticipant(roomName, identity)
+            .orElseThrow(() -> new RuntimeException("Student is not currently connected to the live class"));
+
+        LivekitModels.TrackInfo microphoneTrack = participant.getTracksList().stream()
+            .filter(track -> track.getType() == LivekitModels.TrackType.AUDIO)
+            .findFirst()
+            .orElseThrow(() -> new RuntimeException("Student has no active microphone track"));
+
+        liveKitService.setTrackMuted(roomName, identity, microphoneTrack.getSid(), muted);
+        log.info("Teacher {} {} the microphone of student {} in live class {}",
+            requesterId, muted ? "muted" : "unmuted", participantUserId, liveClassId);
+
+        return MicrophoneActionResponse.builder()
+            .participantId(participantUserId)
+            .muted(muted)
+            .build();
+    }
+
+    private ParticipantResponse toParticipantResponse(LivekitModels.ParticipantInfo info) {
+        String identity = info.getIdentity();
+        UserRole role = roleFromIdentity(identity);
+        Long userId = userIdFromIdentity(identity);
+
+        boolean microphoneMuted = info.getTracksList().stream()
+            .filter(track -> track.getType() == LivekitModels.TrackType.AUDIO)
+            .findFirst()
+            .map(LivekitModels.TrackInfo::getMuted)
+            // No published audio track at all reads as "no live microphone", shown as muted.
+            .orElse(true);
+
+        return ParticipantResponse.builder()
+            .identity(identity)
+            .userId(userId)
+            .name(info.getName())
+            .role(role != null ? role.name() : "UNKNOWN")
+            .connectedAt(info.getJoinedAt() * 1000L)
+            .state(info.getState().name())
+            .microphoneMuted(microphoneMuted)
+            .build();
+    }
+
+    private String roomNameFor(Long liveClassId) {
+        return "class-" + liveClassId;
+    }
+
+    private String participantIdentity(UserRole role, Long userId) {
+        return role.name().toLowerCase() + "-" + userId;
+    }
+
+    private UserRole roleFromIdentity(String identity) {
+        if (identity.startsWith("teacher-")) {
+            return UserRole.TEACHER;
+        }
+        if (identity.startsWith("student-")) {
+            return UserRole.STUDENT;
+        }
+        return null;
+    }
+
+    private Long userIdFromIdentity(String identity) {
+        int dash = identity.lastIndexOf('-');
+        if (dash < 0 || dash == identity.length() - 1) {
+            return null;
+        }
+        try {
+            return Long.parseLong(identity.substring(dash + 1));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
     private LiveClassResponse toLiveClassResponse(LiveClass liveClass, User teacher) {
         return LiveClassResponse.builder()
             .id(liveClass.getId())
