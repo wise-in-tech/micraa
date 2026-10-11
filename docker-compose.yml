@@ -1,23 +1,8 @@
 services:
-  # PostgreSQL Database - Port changé de 5432 à 5433 pour éviter le conflit
-  postgres:
-    image: postgres:15
-    container_name: micraa-postgres
-    environment:
-      POSTGRES_DB: micraa
-      POSTGRES_USER: micraa
-      POSTGRES_PASSWORD: micraa123
-    ports:
-      - "5433:5432"  # Port externe changé à 5433
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U micraa"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - micraa-network
+  # PostgreSQL : un serveur PostgreSQL réel, installé directement sur l'hôte
+  # (plus de conteneur postgres ici). L'app s'y connecte via host.docker.internal
+  # - voir le service "app" ci-dessous et le fichier .env (non versionné) pour
+  # les identifiants.
 
   # LiveKit Server
   livekit:
@@ -40,17 +25,20 @@ services:
       dockerfile: Dockerfile
     container_name: micraa-app
     depends_on:
-      postgres:
-        condition: service_healthy
       livekit:
         condition: service_started
+    # Permet au conteneur de joindre PostgreSQL installé directement sur
+    # l'hôte (et non dans Docker) via le nom host.docker.internal, y compris
+    # sous Linux (host-gateway nécessite Docker Engine >= 20.10).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/micraa
-      SPRING_DATASOURCE_USERNAME: micraa
-      SPRING_DATASOURCE_PASSWORD: micraa123
+      SPRING_DATASOURCE_URL: jdbc:postgresql://host.docker.internal:5432/micraa
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:?DB_USERNAME manquant - voir .env.example}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD manquant - voir .env.example}
       LIVEKIT_URL: wss://livekit.micraa.be
-      LIVEKIT_API_KEY: devkey
-      LIVEKIT_API_SECRET: secret
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:?LIVEKIT_API_KEY manquant - voir .env.example}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?LIVEKIT_API_SECRET manquant - voir .env.example}
     ports:
       - "8080:8080"
     networks:
@@ -79,6 +67,5 @@ networks:
     driver: bridge
 
 volumes:
-  postgres_data:
   caddy_data:
   caddy_config:
