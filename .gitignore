@@ -31,3 +31,8 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Secrets ###
+# Real docker-compose secrets (DB password, LiveKit key/secret, etc.) - see
+# .env.example for the template. Never commit the real .env.
+.env

@@ -39,6 +39,8 @@ services:
       LIVEKIT_URL: wss://livekit.micraa.be
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:?LIVEKIT_API_KEY manquant - voir .env.example}
       LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?LIVEKIT_API_SECRET manquant - voir .env.example}
+      # Optionnel : vide = connexion Google désactivée
+      GOOGLE_AUTH_CLIENT_IDS: ${GOOGLE_AUTH_CLIENT_IDS:-}
     ports:
       - "8080:8080"
     networks:

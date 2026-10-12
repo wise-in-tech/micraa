@@ -175,4 +175,8 @@ Report:
 5. Tests executed and results.
 6. Any remaining limitations.
 
-Do not claim a requirement is complete unless it is implemented in code and covered by a test.
+
+7. Remaining limitations
+- POST /api/live-classes, /start, /end, /join still trust a client-supplied teacherId/userId rather than the JWT identity (pre-existing gap, unlike the new endpoints). Flagged in DOCKER.md as a follow-up, intentionally out of this ticket's scope.
+- Class creation/planning is not yet restricted to ADMIN (that's doc/FUNCTIONAL-REQUIREMENTS.md's broader target, not part of ticket-001's 5 items).
+- The "wakelock enabled while live room is active" success path is verified by code structure + a real failed-connection test, not a full LiveKit-server integration test (no LiveKit server available in this environment).

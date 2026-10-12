@@ -2,6 +2,7 @@ package com.wiseintech.micraa.controller;
 
 import com.wiseintech.micraa.dto.AuthRequest;
 import com.wiseintech.micraa.dto.AuthResponse;
+import com.wiseintech.micraa.dto.GoogleAuthRequest;
 import com.wiseintech.micraa.service.AuthService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -41,6 +42,20 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@RequestBody AuthRequest request) {
         AuthResponse response = authService.login(request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Se connecter (ou créer un compte STUDENT) avec Google
+     * POST /api/auth/google
+     * {
+     *   "idToken": "<Google ID token obtenu par google_sign_in>"
+     * }
+     * Même réponse que /login. 401 si le token est invalide ou l'email non vérifié.
+     */
+    @PostMapping("/google")
+    public ResponseEntity<AuthResponse> google(@RequestBody GoogleAuthRequest request) {
+        AuthResponse response = authService.loginWithGoogle(request);
         return ResponseEntity.ok(response);
     }
 }

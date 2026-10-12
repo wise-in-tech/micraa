@@ -167,4 +167,25 @@ class RoleSecurityTest {
         mockMvc.perform(get("/api/users"))
                 .andExpect(status().isUnauthorized());
     }
+
+    // ─── Google Sign-In ────────────────────────────────────────────────────
+
+    @Test
+    void googleEndpointIsPublicAndRejectsForgedTokenWith401() throws Exception {
+        mockMvc.perform(post("/api/auth/google")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"idToken":"not-a-google-token"}
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error", is("Invalid Google ID token")));
+    }
+
+    @Test
+    void googleEndpointWithoutTokenIs400() throws Exception {
+        mockMvc.perform(post("/api/auth/google")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+    }
 }

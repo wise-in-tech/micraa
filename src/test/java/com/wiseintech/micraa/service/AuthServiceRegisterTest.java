@@ -5,6 +5,7 @@ import com.wiseintech.micraa.dto.AuthResponse;
 import com.wiseintech.micraa.model.User;
 import com.wiseintech.micraa.model.UserRole;
 import com.wiseintech.micraa.repository.UserRepository;
+import com.wiseintech.micraa.security.GoogleTokenVerifier;
 import com.wiseintech.micraa.security.JwtService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,6 +36,8 @@ class AuthServiceRegisterTest {
     private JwtService jwtService;
     @Mock
     private PasswordEncoder passwordEncoder;
+    @Mock
+    private GoogleTokenVerifier googleTokenVerifier;
 
     private AuthService authService;
 
@@ -48,7 +51,7 @@ class AuthServiceRegisterTest {
     }
 
     private void stubHappyPath() {
-        authService = new AuthService(userRepository, jwtService, passwordEncoder);
+        authService = new AuthService(userRepository, jwtService, passwordEncoder, googleTokenVerifier);
         when(userRepository.findByEmail(anyString())).thenReturn(Optional.empty());
         when(passwordEncoder.encode(anyString())).thenReturn("hashed");
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
